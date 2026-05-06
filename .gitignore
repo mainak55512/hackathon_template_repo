@@ -1,0 +1,9 @@
+.env
+backend/.qwe/
+backend/.crul/
+backend/bin/
+backend/include/
+backend/lib/
+backend/__pycache__/
+backend/var/
+backend/.gitignore
