@@ -7,3 +7,5 @@ backend/lib/
 backend/__pycache__/
 backend/var/
 backend/.gitignore
+backend/hackathon.db
+llm/chroma_db/

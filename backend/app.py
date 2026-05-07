@@ -2,9 +2,17 @@ from flask import Flask
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+import sys
+from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parent.parent
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 from db import db, init_db
 from config import Config
 from routes import api, jwt
+from llm.rag.routes import rag_api
 
 
 from dotenv import load_dotenv
@@ -16,6 +24,7 @@ app = Flask(__name__)
 app.config.from_object(Config)
 
 app.register_blueprint(api, url_prefix="/api")
+app.register_blueprint(rag_api, url_prefix="/api")
 
 limiter = Limiter(
     get_remote_address,
