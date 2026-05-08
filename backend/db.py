@@ -117,7 +117,8 @@ class Log(db.Model):
 
     @classmethod
     def all_logs(cls):
-        logs = cls.query.all()
+        # logs = cls.query.all()
+        logs = cls.query.order_by(cls.created_at.desc()).all()
         return [log.to_dict() for log in logs]
 
     def to_dict(self) -> dict:
