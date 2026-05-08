@@ -90,6 +90,26 @@ class UsageRecord(db.Model):
             "embedding_cost": self.embedding_cost,
             "total_cost": self.total_cost,
             "created_at": self.created_at.isoformat(),
+class Log(db.Model):
+    __tablename__ = "logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    input_data = db.Column(db.JSON, nullable=False, default=dict)
+    # normalized_output = db.Column(db.JSON, nullable=False, default=dict)
+    # generated_comments = db.Column(db.Text, nullable=False, default="")
+    user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=False, index=True
+    )
+
+    user = db.relationship("User", back_populates="logs")
+
+    def to_dict(self) -> dict:
+        return {
+            "id": self.id,
+            "input_data": self.input_data,
+            # "normalized_output": self.normalized_output,
+            # "generated_comments": self.generated_comments,
+            "user_id": self.user_id,
         }
 
 
