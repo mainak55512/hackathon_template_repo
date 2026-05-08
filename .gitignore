@@ -1,4 +1,5 @@
 .env
+backend/.venv/
 backend/.qwe/
 backend/.crul/
 backend/bin/
