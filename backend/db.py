@@ -1,6 +1,7 @@
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy import func
 
 db = SQLAlchemy()
 
@@ -51,6 +52,47 @@ class TokenBlocklist(db.Model):
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 
+class UsageRecord(db.Model):
+    """Stores token and cost usage for dashboard reporting."""
+
+    __tablename__ = "usage_records"
+
+    id = db.Column(db.Integer, primary_key=True)
+    event_type = db.Column(db.String(50), nullable=False, index=True)
+    model_name = db.Column(db.String(100), nullable=False)
+    input_tokens = db.Column(db.Integer, nullable=False, default=0)
+    output_tokens = db.Column(db.Integer, nullable=False, default=0)
+    total_tokens = db.Column(db.Integer, nullable=False, default=0)
+    cached_input_tokens = db.Column(db.Integer, nullable=False, default=0)
+    query_embedding_tokens = db.Column(db.Integer, nullable=False, default=0)
+    embedding_tokens = db.Column(db.Integer, nullable=False, default=0)
+    llm_input_cost = db.Column(db.Float, nullable=False, default=0.0)
+    llm_output_cost = db.Column(db.Float, nullable=False, default=0.0)
+    llm_cached_input_cost = db.Column(db.Float, nullable=False, default=0.0)
+    embedding_cost = db.Column(db.Float, nullable=False, default=0.0)
+    total_cost = db.Column(db.Float, nullable=False, default=0.0)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "event_type": self.event_type,
+            "model_name": self.model_name,
+            "input_tokens": self.input_tokens,
+            "output_tokens": self.output_tokens,
+            "total_tokens": self.total_tokens,
+            "cached_input_tokens": self.cached_input_tokens,
+            "query_embedding_tokens": self.query_embedding_tokens,
+            "embedding_tokens": self.embedding_tokens,
+            "llm_input_cost": self.llm_input_cost,
+            "llm_output_cost": self.llm_output_cost,
+            "llm_cached_input_cost": self.llm_cached_input_cost,
+            "embedding_cost": self.embedding_cost,
+            "total_cost": self.total_cost,
+            "created_at": self.created_at.isoformat(),
+        }
+
+
 def init_db():
     for role_name in ["Admin", "Viewer"]:
         if not Role.query.filter_by(name=role_name).first():
@@ -73,3 +115,39 @@ def init_db():
 
     db.session.commit()
     print("Database initialized with default users:")
+
+
+def record_usage(
+    *,
+    event_type: str,
+    model_name: str,
+    input_tokens: int = 0,
+    output_tokens: int = 0,
+    total_tokens: int = 0,
+    cached_input_tokens: int = 0,
+    query_embedding_tokens: int = 0,
+    embedding_tokens: int = 0,
+    llm_input_cost: float = 0.0,
+    llm_output_cost: float = 0.0,
+    llm_cached_input_cost: float = 0.0,
+    embedding_cost: float = 0.0,
+    total_cost: float = 0.0,
+) -> UsageRecord:
+    record = UsageRecord(
+        event_type=event_type,
+        model_name=model_name,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        total_tokens=total_tokens,
+        cached_input_tokens=cached_input_tokens,
+        query_embedding_tokens=query_embedding_tokens,
+        embedding_tokens=embedding_tokens,
+        llm_input_cost=llm_input_cost,
+        llm_output_cost=llm_output_cost,
+        llm_cached_input_cost=llm_cached_input_cost,
+        embedding_cost=embedding_cost,
+        total_cost=total_cost,
+    )
+    db.session.add(record)
+    db.session.commit()
+    return record

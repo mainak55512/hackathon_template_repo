@@ -1,8 +1,5 @@
 from flask import jsonify, request, Blueprint
-from datetime import timedelta, datetime
-import os
-import json
-import requests
+from sqlalchemy import func
 from flask_jwt_extended import (
     JWTManager,
     create_access_token,
@@ -46,7 +43,7 @@ def missing_token_callback(error):
 
 
 @api.route("/roles", methods=["GET"])
-@jwt_required()
+@admin_required
 def get_roles():
     roles = Role.query.all()
     return jsonify([r.to_dict() for r in roles])
@@ -84,9 +81,9 @@ def login():
 
     additional_claims = {"role": user.role.name, "username": user.username}
     access_token = create_access_token(
-        identity=user.id, additional_claims=additional_claims
+        identity=str(user.id), additional_claims=additional_claims
     )
-    refresh_token = create_refresh_token(identity=user.id)
+    refresh_token = create_refresh_token(identity=str(user.id))
 
     return jsonify(
         {
@@ -100,7 +97,7 @@ def login():
 @api.route("/auth/refresh", methods=["POST"])
 @jwt_required(refresh=True)
 def refresh():
-    identity = get_jwt_identity()
+    identity = int(get_jwt_identity())
     user = User.query.get(identity)
     if not user:
         return jsonify({"error": "User not found"}), 404
@@ -124,35 +121,35 @@ def logout():
 @api.route("/auth/me", methods=["GET"])
 @jwt_required()
 def me():
-    user = User.query.get(get_jwt_identity())
+    user = User.query.get(int(get_jwt_identity()))
     if not user:
         return jsonify({"error": "User not found"}), 404
     return jsonify(user.to_dict())
 
 
 @api.route("/dashboard/stats", methods=["GET"])
-@jwt_required()
+@admin_required
 def dashboard_stats():
+    return jsonify(_dashboard_stats_payload())
+
+
+def _dashboard_stats_payload():
     total_users = User.query.count()
     active_users = User.query.filter_by(is_active=True).count()
     admin_count = User.query.join(Role).filter(Role.name == "Admin").count()
     viewer_count = User.query.join(Role).filter(Role.name == "Viewer").count()
-    return jsonify(
-        {
-            "total_users": total_users,
-            "active_users": active_users,
-            "inactive_users": total_users - active_users,
-            "admin_count": admin_count,
-            "viewer_count": viewer_count,
-        }
-    )
+    return {
+        "total_users": total_users,
+        "active_users": active_users,
+        "inactive_users": total_users - active_users,
+        "admin_count": admin_count,
+        "viewer_count": viewer_count,
+    }
 
 
 @api.route("/users", methods=["GET"])
-@jwt_required()
-# @admin_required
+@admin_required
 def get_users():
-    """All authenticated users can list users."""
     users = User.query.order_by(User.created_at.desc()).all()
     return jsonify([u.to_dict() for u in users])
 
@@ -183,7 +180,7 @@ def create_user():
 
 
 @api.route("/users/<int:user_id>", methods=["GET"])
-@jwt_required()
+@admin_required
 def get_user(user_id):
     user = User.query.get_or_404(user_id)
     return jsonify(user.to_dict())
@@ -219,7 +216,7 @@ def update_user(user_id):
 @admin_required
 def delete_user(user_id):
     # Prevent self-deletion
-    current_user_id = get_jwt_identity()
+    current_user_id = int(get_jwt_identity())
     if user_id == current_user_id:
         return jsonify({"error": "You cannot delete your own account"}), 400
 
@@ -227,3 +224,70 @@ def delete_user(user_id):
     db.session.delete(user)
     db.session.commit()
     return jsonify({"message": f"User '{user.username}' deleted successfully"})
+
+
+@api.route("/admin/panel-data", methods=["GET"])
+@admin_required
+def admin_panel_data():
+    stats = _dashboard_stats_payload()
+    users = User.query.order_by(User.created_at.desc()).all()
+    roles = Role.query.order_by(Role.name.asc()).all()
+
+    usage_agg = (
+        db.session.query(
+            func.count(UsageRecord.id),
+            func.coalesce(func.sum(UsageRecord.input_tokens), 0),
+            func.coalesce(func.sum(UsageRecord.output_tokens), 0),
+            func.coalesce(func.sum(UsageRecord.total_tokens), 0),
+            func.coalesce(func.sum(UsageRecord.cached_input_tokens), 0),
+            func.coalesce(func.sum(UsageRecord.query_embedding_tokens), 0),
+            func.coalesce(func.sum(UsageRecord.embedding_tokens), 0),
+            func.coalesce(func.sum(UsageRecord.llm_input_cost), 0.0),
+            func.coalesce(func.sum(UsageRecord.llm_output_cost), 0.0),
+            func.coalesce(func.sum(UsageRecord.llm_cached_input_cost), 0.0),
+            func.coalesce(func.sum(UsageRecord.embedding_cost), 0.0),
+            func.coalesce(func.sum(UsageRecord.total_cost), 0.0),
+        )
+        .one()
+    )
+    (
+        usage_count,
+        input_tokens,
+        output_tokens,
+        total_tokens,
+        cached_input_tokens,
+        query_embedding_tokens,
+        embedding_tokens,
+        llm_input_cost,
+        llm_output_cost,
+        llm_cached_input_cost,
+        embedding_cost,
+        total_cost,
+    ) = usage_agg
+
+    recent_usage = (
+        UsageRecord.query.order_by(UsageRecord.created_at.desc()).limit(10).all()
+    )
+
+    return jsonify(
+        {
+            "stats": stats,
+            "roles": [role.to_dict() for role in roles],
+            "users": [user.to_dict() for user in users],
+            "usage": {
+                "count": int(usage_count or 0),
+                "input_tokens": int(input_tokens or 0),
+                "output_tokens": int(output_tokens or 0),
+                "total_tokens": int(total_tokens or 0),
+                "cached_input_tokens": int(cached_input_tokens or 0),
+                "query_embedding_tokens": int(query_embedding_tokens or 0),
+                "embedding_tokens": int(embedding_tokens or 0),
+                "llm_input_cost": float(llm_input_cost or 0.0),
+                "llm_output_cost": float(llm_output_cost or 0.0),
+                "llm_cached_input_cost": float(llm_cached_input_cost or 0.0),
+                "embedding_cost": float(embedding_cost or 0.0),
+                "total_cost": float(total_cost or 0.0),
+                "recent": [entry.to_dict() for entry in recent_usage],
+            },
+        }
+    )

@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="/admin/styles.css" />
+  </head>
+  <body>
+    <div class="background-orb orb-one"></div>
+    <div class="background-orb orb-two"></div>
+    <main class="shell">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">Hackathon Admin Panel</p>
+          <h1>User control, role governance, and usage visibility in one place.</h1>
+          <p class="lede">
+            Manage users, assign roles, and keep an eye on token usage and model cost
+            without leaving the dashboard.
+          </p>
+        </div>
+        <div class="hero-card">
+          <div class="status-pill" id="authStatus">Not signed in</div>
+          <button class="ghost-button" id="logoutButton" type="button">Sign out</button>
+        </div>
+      </section>
+
+      <section class="panel auth-panel" id="authPanel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Access</p>
+            <h2>Sign in to open the admin surface</h2>
+          </div>
+        </div>
+        <form class="form-grid" id="loginForm">
+          <label>
+            <span>Username</span>
+            <input name="username" autocomplete="username" placeholder="admin" required />
+          </label>
+          <label>
+            <span>Password</span>
+            <input
+              name="password"
+              type="password"
+              autocomplete="current-password"
+              placeholder="password"
+              required
+            />
+          </label>
+          <div class="form-actions">
+            <button class="primary-button" type="submit">Open dashboard</button>
+            <p class="hint">Use an Admin account. Viewer accounts will be blocked by RBAC.</p>
+          </div>
+        </form>
+        <div class="message" id="authMessage" hidden></div>
+      </section>
+
+      <section class="dashboard" id="dashboard" hidden>
+        <div class="metrics" id="statsGrid"></div>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Users</p>
+              <h2>All users and assigned roles</h2>
+            </div>
+            <button class="secondary-button" id="refreshButton" type="button">Refresh data</button>
+          </div>
+
+          <div class="table-wrap">
+            <table class="users-table">
+              <thead>
+                <tr>
+                  <th>Username</th>
+                  <th>Email</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="usersTableBody"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">CRUD</p>
+              <h2 id="userFormTitle">Create a user</h2>
+            </div>
+            <button class="ghost-button" id="cancelEditButton" type="button" hidden>Cancel edit</button>
+          </div>
+
+          <form class="form-grid" id="userForm">
+            <label>
+              <span>Username</span>
+              <input name="username" autocomplete="off" required />
+            </label>
+            <label>
+              <span>Email</span>
+              <input name="email" type="email" autocomplete="off" required />
+            </label>
+            <label>
+              <span>Password</span>
+              <input
+                name="password"
+                type="password"
+                autocomplete="new-password"
+                placeholder="Leave blank when editing"
+              />
+            </label>
+            <label>
+              <span>Role</span>
+              <select name="role" id="userRoleSelect" required></select>
+            </label>
+            <label class="toggle-row">
+              <span>Active</span>
+              <input name="is_active" type="checkbox" checked />
+            </label>
+            <div class="form-actions">
+              <button class="primary-button" type="submit" id="userSubmitButton">Create user</button>
+              <p class="hint">Edit a row to update a user, or create a new one with the form.</p>
+            </div>
+          </form>
+          <div class="message" id="userMessage" hidden></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Usage</p>
+              <h2>Token usage and cost</h2>
+            </div>
+          </div>
+          <div class="metrics compact" id="usageGrid"></div>
+          <div class="usage-list" id="usageList"></div>
+        </section>
+      </section>
+    </main>
+
+    <script src="/admin/app.js" defer></script>
+  </body>
+</html>

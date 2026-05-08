@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, send_from_directory
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
+BACKEND_DIR = Path(__file__).resolve().parent
+ADMIN_UI_DIR = BACKEND_DIR / "admin_portal"
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
@@ -37,6 +39,30 @@ db.init_app(app)
 jwt.init_app(app)
 
 CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+
+@app.route("/")
+def root():
+    return send_from_directory(ADMIN_UI_DIR, "index.html")
+
+
+@app.route("/admin")
+@app.route("/admin/")
+def admin_panel():
+    return send_from_directory(ADMIN_UI_DIR, "index.html")
+
+
+@app.route("/admin/<path:filename>")
+def admin_assets(filename: str):
+    return send_from_directory(ADMIN_UI_DIR, filename)
+
+
+@app.route("/favicon.ico")
+def favicon():
+    favicon_path = ADMIN_UI_DIR / "favicon.ico"
+    if favicon_path.exists():
+        return send_from_directory(ADMIN_UI_DIR, "favicon.ico")
+    return ("", 204)
 
 
 if __name__ == "__main__":

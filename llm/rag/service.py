@@ -10,6 +10,7 @@ from chromadb.config import Settings
 from openai import OpenAI
 
 from config import Config
+from db import record_usage
 
 from .documents import DocumentChunk, build_document_chunks, compute_documents_fingerprint
 from .pricing import estimate_cost
@@ -238,6 +239,24 @@ def build_or_refresh_index(force: bool = False) -> Dict[str, Any]:
         embedding_model=Config.OPENAI_EMBEDDING_MODEL,
         embedding_tokens=embedding_usage["embedding_tokens"],
     )
+    try:
+        record_usage(
+            event_type="rag_reindex",
+            model_name=Config.OPENAI_EMBEDDING_MODEL,
+            input_tokens=0,
+            output_tokens=0,
+            total_tokens=0,
+            cached_input_tokens=0,
+            query_embedding_tokens=0,
+            embedding_tokens=embedding_usage["embedding_tokens"],
+            llm_input_cost=0.0,
+            llm_output_cost=0.0,
+            llm_cached_input_cost=0.0,
+            embedding_cost=indexing_cost["embedding_cost"],
+            total_cost=indexing_cost["total_cost"],
+        )
+    except Exception:
+        pass
     return {
         "index_status": get_index_status(),
         "indexing": {
@@ -388,6 +407,24 @@ def answer_question(
         embedding_model=Config.OPENAI_EMBEDDING_MODEL,
         embedding_tokens=retrieval["query_embedding_tokens"],
     )
+    try:
+        record_usage(
+            event_type="rag_ask",
+            model_name=model_name,
+            input_tokens=usage["input_tokens"],
+            output_tokens=usage["output_tokens"],
+            total_tokens=usage["total_tokens"],
+            cached_input_tokens=usage["cached_input_tokens"],
+            query_embedding_tokens=retrieval["query_embedding_tokens"],
+            embedding_tokens=retrieval["query_embedding_tokens"],
+            llm_input_cost=cost["llm_input_cost"],
+            llm_output_cost=cost["llm_output_cost"],
+            llm_cached_input_cost=cost["llm_cached_input_cost"],
+            embedding_cost=cost["embedding_cost"],
+            total_cost=cost["total_cost"],
+        )
+    except Exception:
+        pass
 
     return {
         "answer": answer_text,
