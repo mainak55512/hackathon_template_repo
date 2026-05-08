@@ -4,18 +4,17 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import sys
 from pathlib import Path
+from db import db, init_db
+from config import Config
+from routes import api, jwt
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from db import db, init_db
-from config import Config
-from routes import api, jwt
 from llm.rag.routes import rag_api
-
-
 from dotenv import load_dotenv
+
 
 load_dotenv()
 

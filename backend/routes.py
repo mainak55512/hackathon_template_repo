@@ -49,6 +49,13 @@ def missing_token_callback(error):
 @jwt_required()
 def get_roles():
     roles = Role.query.all()
+    identity = get_jwt_identity()
+    user = User.query.get(identity)
+    Log.info(
+        f"""User {user.username} has the following roles:
+{"\n".join([r.name for r in roles])}
+        """
+    )
     return jsonify([r.to_dict() for r in roles])
 
 
@@ -79,14 +86,18 @@ def login():
     user = User.query.filter_by(username=username).first()
     if not user or not user.check_password(password):
         return jsonify({"error": "Invalid credentials"}), 401
+
     if not user.is_active:
         return jsonify({"error": "Account is disabled"}), 403
 
-    additional_claims = {"role": user.role.name, "username": user.username}
+    role_names = [role.name for role in user.roles]
+
+    additional_claims = {"roles": role_names, "username": user.username}
+
     access_token = create_access_token(
-        identity=user.id, additional_claims=additional_claims
+        identity=str(user.id), additional_claims=additional_claims
     )
-    refresh_token = create_refresh_token(identity=user.id)
+    refresh_token = create_refresh_token(identity=str(user.id))
 
     return jsonify(
         {
@@ -105,7 +116,12 @@ def refresh():
     if not user:
         return jsonify({"error": "User not found"}), 404
 
-    additional_claims = {"role": user.role.name, "username": user.username}
+    if not user.is_active:
+        return jsonify({"error": "User account is disabled"}), 403
+
+    role_names = [role.name for role in user.roles]
+
+    additional_claims = {"roles": role_names, "username": user.username}
     access_token = create_access_token(
         identity=identity, additional_claims=additional_claims
     )
@@ -227,3 +243,10 @@ def delete_user(user_id):
     db.session.delete(user)
     db.session.commit()
     return jsonify({"message": f"User '{user.username}' deleted successfully"})
+
+
+@api.route("/all_logs", methods=["GET"])
+@jwt_required()
+@admin_required
+def get_all_logs():
+    return jsonify(Log.all_logs())

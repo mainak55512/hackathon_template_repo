@@ -17,16 +17,24 @@ def role_required(*roles):
         @jwt_required()
         def wrapper(*args, **kwargs):
             user_id = get_jwt_identity()
+
             user = User.query.get(user_id)
+
             if not user:
                 return jsonify({"error": "User not found"}), 404
-            if user.role.name not in roles:
+
+            user_role_names = [r.name for r in user.roles]
+
+            has_permission = any(role in user_role_names for role in roles)
+
+            if not has_permission:
                 return jsonify(
                     {
                         "error": f"Access denied. Required role(s): {', '.join(roles)}",
                         "code": "FORBIDDEN",
                     }
                 ), 403
+
             return fn(*args, **kwargs)
 
         return wrapper
