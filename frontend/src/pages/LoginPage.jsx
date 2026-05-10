@@ -16,8 +16,9 @@ const LoginPage = ({ onLoginSuccess }) => {
     const data = await api.login(creds.username, creds.password);
     setIsLoading(false);
 
-    if (data.access_token) {
+    if (data.access_token && data.refresh_token) {
       localStorage.setItem('access_token', data.access_token);
+      localStorage.setItem('refresh_token', data.refresh_token);
       onLoginSuccess(data.user);
       navigate('/dashboard');
     } else {

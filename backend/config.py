@@ -11,7 +11,7 @@ class Config:
     JWT_SECRET_KEY = os.getenv(
         "JWT_SECRET_KEY", "dev - secret - key - CHANGE - IN - PRODUCTION"
     )
-    JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
+    JWT_ACCESS_TOKEN_EXPIRES = timedelta(minutes=15)
     JWT_REFRESH_TOKEN_EXPIRES = timedelta(days=7)
 
     RAG_DOCUMENTS_DIR = os.getenv(
