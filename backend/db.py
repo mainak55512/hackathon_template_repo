@@ -2,6 +2,7 @@ import enum
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy import func
 
 db = SQLAlchemy()
 
@@ -127,7 +128,114 @@ class Log(db.Model):
             "message": self.message,
             "user": self.user.username,
             "log_level": self.log_level,
-            "created_at": self.created_at,
+            "created_at": self.created_at.isoformat(),
+        }
+
+
+class LLMUsage(db.Model):
+    __tablename__ = "llm_usage"
+
+    id = db.Column(db.Integer, primary_key=True)
+    usage_type = db.Column(db.String(32), nullable=False, index=True)
+    model_name = db.Column(db.String(128), nullable=False, index=True)
+    input_tokens = db.Column(db.Integer, nullable=False, default=0)
+    output_tokens = db.Column(db.Integer, nullable=False, default=0)
+    cached_input_tokens = db.Column(db.Integer, nullable=False, default=0)
+    embedding_tokens = db.Column(db.Integer, nullable=False, default=0)
+    llm_input_cost = db.Column(db.Float, nullable=False, default=0.0)
+    llm_output_cost = db.Column(db.Float, nullable=False, default=0.0)
+    llm_cached_input_cost = db.Column(db.Float, nullable=False, default=0.0)
+    embedding_cost = db.Column(db.Float, nullable=False, default=0.0)
+    total_cost = db.Column(db.Float, nullable=False, default=0.0)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, index=True)
+
+    @classmethod
+    def record(
+        cls,
+        *,
+        usage_type: str,
+        model_name: str,
+        input_tokens: int = 0,
+        output_tokens: int = 0,
+        cached_input_tokens: int = 0,
+        embedding_tokens: int = 0,
+        llm_input_cost: float = 0.0,
+        llm_output_cost: float = 0.0,
+        llm_cached_input_cost: float = 0.0,
+        embedding_cost: float = 0.0,
+        total_cost: float = 0.0,
+    ):
+        record = cls(
+            usage_type=usage_type,
+            model_name=model_name,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            cached_input_tokens=cached_input_tokens,
+            embedding_tokens=embedding_tokens,
+            llm_input_cost=llm_input_cost,
+            llm_output_cost=llm_output_cost,
+            llm_cached_input_cost=llm_cached_input_cost,
+            embedding_cost=embedding_cost,
+            total_cost=total_cost,
+        )
+        db.session.add(record)
+        db.session.commit()
+        return record
+
+    @classmethod
+    def aggregate_between(cls, start_at, end_at):
+        row = (
+            db.session.query(
+                func.coalesce(func.sum(cls.input_tokens), 0),
+                func.coalesce(func.sum(cls.output_tokens), 0),
+                func.coalesce(func.sum(cls.cached_input_tokens), 0),
+                func.coalesce(func.sum(cls.embedding_tokens), 0),
+                func.coalesce(func.sum(cls.llm_input_cost), 0.0),
+                func.coalesce(func.sum(cls.llm_output_cost), 0.0),
+                func.coalesce(func.sum(cls.llm_cached_input_cost), 0.0),
+                func.coalesce(func.sum(cls.embedding_cost), 0.0),
+                func.coalesce(func.sum(cls.total_cost), 0.0),
+                func.count(cls.id),
+            )
+            .filter(cls.created_at >= start_at, cls.created_at < end_at)
+            .one()
+        )
+
+        return {
+            "input_tokens": int(row[0] or 0),
+            "output_tokens": int(row[1] or 0),
+            "cached_input_tokens": int(row[2] or 0),
+            "embedding_tokens": int(row[3] or 0),
+            "llm_input_cost": round(float(row[4] or 0.0), 8),
+            "llm_output_cost": round(float(row[5] or 0.0), 8),
+            "llm_cached_input_cost": round(float(row[6] or 0.0), 8),
+            "embedding_cost": round(float(row[7] or 0.0), 8),
+            "total_cost": round(float(row[8] or 0.0), 8),
+            "request_count": int(row[9] or 0),
+            "total_tokens": int((row[0] or 0) + (row[1] or 0) + (row[2] or 0) + (row[3] or 0)),
+        }
+
+    @classmethod
+    def recent(cls, limit=20):
+        rows = cls.query.order_by(cls.created_at.desc()).limit(limit).all()
+        return [cls.to_summary_dict(row) for row in rows]
+
+    @staticmethod
+    def to_summary_dict(row) -> dict:
+        return {
+            "id": row.id,
+            "usage_type": row.usage_type,
+            "model_name": row.model_name,
+            "input_tokens": row.input_tokens,
+            "output_tokens": row.output_tokens,
+            "cached_input_tokens": row.cached_input_tokens,
+            "embedding_tokens": row.embedding_tokens,
+            "llm_input_cost": row.llm_input_cost,
+            "llm_output_cost": row.llm_output_cost,
+            "llm_cached_input_cost": row.llm_cached_input_cost,
+            "embedding_cost": row.embedding_cost,
+            "total_cost": row.total_cost,
+            "created_at": row.created_at.isoformat(),
         }
 
 

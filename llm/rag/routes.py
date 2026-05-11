@@ -2,8 +2,15 @@ from __future__ import annotations
 
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
+from rbac import admin_required
 
-from .service import answer_question, build_or_refresh_index, get_index_status
+from .service import (
+    answer_question,
+    build_or_refresh_index,
+    get_index_status,
+    get_usage_summary,
+    get_model_catalog,
+)
 
 
 rag_api = Blueprint("rag_api", __name__)
@@ -46,3 +53,16 @@ def rag_ask():
         return jsonify({"error": str(exc)}), 400
 
     return jsonify(result)
+
+
+@rag_api.route("/rag/models", methods=["GET"])
+@jwt_required()
+def rag_models():
+    return jsonify(get_model_catalog())
+
+
+@rag_api.route("/llm/usage", methods=["GET"])
+@jwt_required()
+@admin_required
+def llm_usage():
+    return jsonify(get_usage_summary())

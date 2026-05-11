@@ -1,24 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import api from './services/api';
 import LoginPage from './pages/LoginPage';
 import AdminDashboard from './pages/AdminDashboard';
+import RagLab from './pages/RagLab';
 
-// Wrapper component to handle Nav and Layout logic
 const MainLayout = ({ user, handleLogout, children }) => {
+  const navigate = useNavigate();
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+    <div className="app-shell">
       <nav className="app-nav">
         <div className="nav-container">
           <div className="nav-logo-group">
             <div className="nav-logo-icon">S</div>
-            <span className="nav-logo-text">System<span className="nav-logo-text-alt">Manager</span></span>
+            <span className="nav-logo-text">
+              SYSTEM<span className="nav-logo-text-alt">MANAGER</span>
+            </span>
           </div>
-          
+
           <div className="nav-actions">
             <div className="user-badge">
               <span className="user-avatar">
-                {user.username?.[0].toUpperCase()}
+                {user.username?.[0]?.toUpperCase()}
               </span>
               <span className="user-name">{user.username}</span>
               <span className="badge-divider">|</span>
@@ -27,13 +31,14 @@ const MainLayout = ({ user, handleLogout, children }) => {
             <button onClick={handleLogout} className="btn-logout">
               Logout
             </button>
+            <button onClick={() => navigate('/rag-lab')} className="btn-logout">
+              RAG Lab
+            </button>
           </div>
         </div>
       </nav>
-      
-      <main className="app-main">
-        {children}
-      </main>
+
+      <main className="app-main">{children}</main>
 
       <footer className="app-footer">
         © 2026 SYSTEM_MANAGER_CORP. ALL PRIVILEGES SECURED.
@@ -44,96 +49,89 @@ const MainLayout = ({ user, handleLogout, children }) => {
 
 function App() {
   const [user, setUser] = useState(null);
-  const [initialized, setInitialized] = useState(false);
+  const [initialized, setInitialized] = useState(() => !localStorage.getItem('access_token'));
 
   useEffect(() => {
     const token = localStorage.getItem('access_token');
-    if (token) {
-      api.request('/auth/me')
-        .then(u => { if (u.username) setUser(u); })
-        .finally(() => setInitialized(true));
-    } else {
-      setInitialized(true);
+
+    if (!token) {
+      return;
     }
+
+    api.request('/auth/me')
+      .then((u) => {
+        if (u.username) setUser(u);
+      })
+      .finally(() => setInitialized(true));
   }, []);
 
   const handleLogout = () => {
     localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
     setUser(null);
-    // Redirect logic is handled by the Routes below
   };
 
-  if (!initialized) return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap');
-        .init-root {
-          min-height: 100vh;
-          background-color: #0d0d0d;
-          background-image:
-            linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
-          background-size: 40px 40px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 16px;
-          font-family: 'IBM Plex Mono', monospace;
-          color: #d97706;
-          font-size: 13px;
-        }
-        .init-spinner {
-          width: 24px;
-          height: 24px;
-          border: 2px solid #222222;
-          border-top-color: #d97706;
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
-      <div className="init-root">
-        <div className="init-spinner" />
-        <span>BOOTING_SYSTEM_SHELL_V1.0.4...</span>
-      </div>
-    </>
-  );
+  if (!initialized) {
+    return (
+      <>
+        <style>{`
+          .init-root {
+            min-height: 100vh;
+            background:
+              radial-gradient(circle at top, rgba(59, 130, 246, 0.14), transparent 34%),
+              linear-gradient(180deg, #0b1220 0%, #111827 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            font-family: var(--mono);
+            color: var(--text-primary);
+            font-size: 12px;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+          }
+
+          .init-spinner {
+            width: 26px;
+            height: 26px;
+            border: 2px solid rgba(255, 255, 255, 0.12);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+          }
+
+          @keyframes spin {
+            to {
+              transform: rotate(360deg);
+            }
+          }
+        `}</style>
+        <div className="init-root">
+          <div className="init-spinner" />
+          <span>BOOTING_SYSTEM_SHELL_V1.0.4...</span>
+        </div>
+      </>
+    );
+  }
 
   return (
     <BrowserRouter>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
-        .app-root { background-color: #0d0d0d; min-height: 100vh; font-family: 'IBM Plex Sans', sans-serif; color: #e5e5e5; }
-        .app-nav { background: #111111; border-bottom: 1px solid #1e1e1e; position: sticky; top: 0; z-index: 100; }
-        .nav-container { max-width: 100%; margin: 0 auto; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; box-sizing: border-box; }
-        .nav-logo-group { display: flex; align-items: center; gap: 10px; }
-        .nav-logo-icon { height: 28px; width: 28px; background: #d97706; color: #0d0d0d; display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 16px; }
-        .nav-logo-text { font-family: 'IBM Plex Mono', monospace; font-size: 1.15rem; font-weight: 600; color: #f5f5f5; letter-spacing: -0.02em; }
-        .nav-logo-text-alt { color: #d97706; font-weight: 400; }
-        .nav-actions { display: flex; align-items: center; gap: 1.5rem; }
-        .user-badge { display: flex; align-items: center; gap: 10px; background: #0a0a0a; border: 1px solid #222222; border-left: 2px solid #d97706; padding: 6px 14px; }
-        .user-avatar { height: 20px; width: 20px; background: rgba(217, 119, 6, 0.1); border: 1px solid rgba(217, 119, 6, 0.3); color: #d97706; display: flex; align-items: center; justify-content: center; font-family: 'IBM Plex Mono', monospace; font-weight: 600; font-size: 11px; }
-        .user-name { font-family: 'IBM Plex Mono', monospace; font-size: 12px; font-weight: 500; color: #e5e5e5; }
-        .badge-divider { color: #2a2a2a; font-size: 12px; }
-        .user-role { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #d97706; text-transform: uppercase; letter-spacing: 0.05em; }
-        .btn-logout { background: transparent; border: 1px solid #222222; color: #8a8a8a; font-family: 'IBM Plex Mono', monospace; font-size: 11px; text-transform: uppercase; padding: 6px 14px; cursor: pointer; transition: all 0.15s ease; }
-        .btn-logout:hover { border-color: rgba(220, 38, 38, 0.4); background: rgba(220, 38, 38, 0.05); color: #f87171; }
-        .app-main { flex-grow: 1; width: 100%; box-sizing: border-box; }
-        .app-footer { background: #111111; border-top: 1px solid #1e1e1e; padding: 1.5rem 2rem; text-align: center; font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: #4a4a4a; letter-spacing: 0.05em; }
-      `}</style>
-
       <div className="app-root">
         <Routes>
-          {/* LOGIN ROUTE */}
-          <Route 
-            path="/login" 
-            element={!user ? <LoginPage onLoginSuccess={(u) => setUser(u)} /> : <Navigate to="/dashboard" replace />} 
+          <Route
+            path="/login"
+            element={
+              !user ? (
+                <LoginPage onLoginSuccess={(u) => setUser(u)} />
+              ) : (
+                <Navigate to="/dashboard" replace />
+              )
+            }
           />
 
-          {/* DASHBOARD ROUTE */}
-          <Route 
-            path="/dashboard" 
+          <Route
+            path="/dashboard"
             element={
               user ? (
                 <MainLayout user={user} handleLogout={handleLogout}>
@@ -142,13 +140,188 @@ function App() {
               ) : (
                 <Navigate to="/login" replace />
               )
-            } 
+            }
           />
 
-          {/* DEFAULT REDIRECT */}
-          <Route path="/" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
-          <Route path="*" element={<Navigate to={user ? "/dashboard" : "/login"} replace />} />
+          <Route
+            path="/rag-lab"
+            element={
+              user ? (
+                <MainLayout user={user} handleLogout={handleLogout}>
+                  <RagLab />
+                </MainLayout>
+              ) : (
+                <Navigate to="/login" replace />
+              )
+            }
+          />
+
+          <Route path="/" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
+          <Route path="*" element={<Navigate to={user ? '/dashboard' : '/login'} replace />} />
         </Routes>
+
+        <style>{`
+          .app-root {
+            min-height: 100vh;
+            color: var(--text-primary);
+            background:
+              radial-gradient(circle at top, rgba(59, 130, 246, 0.12), transparent 34%),
+              linear-gradient(180deg, #0b1220 0%, var(--surface) 100%);
+          }
+
+          .app-shell {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+          }
+
+          .app-nav {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(17, 24, 39, 0.92);
+            backdrop-filter: blur(14px);
+            border-bottom: 1px solid var(--border);
+          }
+
+          .nav-container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+          }
+
+          .nav-logo-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+          }
+
+          .nav-logo-icon {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--primary);
+            color: #fff;
+            font-family: var(--mono);
+            font-size: 14px;
+            font-weight: 700;
+            border-radius: 4px;
+            box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+          }
+
+          .nav-logo-text {
+            font-family: var(--mono);
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: 0.08em;
+          }
+
+          .nav-logo-text-alt {
+            color: var(--text-muted);
+            margin-left: 4px;
+          }
+
+          .nav-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+          }
+
+          .user-badge {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 12px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+          }
+
+          .user-avatar {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(59, 130, 246, 0.16);
+            border: 1px solid rgba(59, 130, 246, 0.45);
+            color: #fff;
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 700;
+            border-radius: 999px;
+          }
+
+          .user-name,
+          .user-role,
+          .badge-divider {
+            font-family: var(--mono);
+            text-transform: uppercase;
+          }
+
+          .user-name {
+            font-size: 12px;
+            color: var(--text-primary);
+            font-weight: 600;
+          }
+
+          .badge-divider {
+            color: var(--border);
+            font-size: 11px;
+          }
+
+          .user-role {
+            font-size: 10px;
+            color: var(--text-muted);
+            font-weight: 700;
+          }
+
+          .btn-logout {
+            border: 1px solid var(--border);
+            background: transparent;
+            color: var(--text-primary);
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-family: var(--mono);
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: background 0.15s ease, border-color 0.15s ease, filter 0.15s ease;
+          }
+
+          .btn-logout:hover {
+            background: var(--surface-2);
+            border-color: var(--primary);
+            filter: brightness(1.1);
+          }
+
+          .app-main {
+            flex-grow: 1;
+            width: 100%;
+          }
+
+          .app-footer {
+            margin-top: auto;
+            background: rgba(17, 24, 39, 0.9);
+            border-top: 1px solid var(--border);
+            padding: 14px 24px;
+            text-align: center;
+            font-family: var(--mono);
+            font-size: 10px;
+            color: var(--text-muted);
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+          }
+
+        `}</style>
       </div>
     </BrowserRouter>
   );
