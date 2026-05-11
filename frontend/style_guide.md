@@ -1,35 +1,42 @@
-Visual Theme: Dark-mode, high-contrast, "Terminal/System Telemetry" aesthetic.  
-1\. Color Palette (CSS Variables)  
-Background (Surface): \#111827 (Deep Gray/Black)  
-Card/Modal Background: \#1f2937 (Lighter Gray)  
-Primary Action (Blue): \#3b82f6  
-Success (Active/Green): \#4ade80  
-Danger (Error/Red): \#f87171  
-Text (Primary): \#ffffff (Pure White)  
-Text (Muted/Labels): \#9ca3af (Cool Gray)  
-Border/Divider: \#374151  
-2\. Component Blueprints  
-A. Buttons  
-Primary: Background \#3b82f6, white text, small border-radius (4px-6px), bold font, hover state: brightness 110%.  
-Action (Edit/Neutral): Transparent background, border 1px solid \#374151, color white, hover: background \#374151.  
-Sizing: Padding 8px 16px for standard; 4px 8px for table actions.  
-B. Typography  
-Headings: Uppercase, letter-spacing 0.05em, bold. (Example: RECONFIGURING\_IDENTITY)  
-Labels: Small, muted color (\#9ca3af), bold, bottom margin 4px.  
-Inputs: Background \#111827, border 1px solid \#374151, color white. Focus state: border-color \#3b82f6.  
-C. Data Tables  
-Header: Darker background, muted uppercase text, sticky position.  
-Cells: Border-bottom 1px solid \#374151, padding 12px 16px.  
-Status Indicators: Small colored dots (8px circle) next to text.  
-3\. Logic & API Standards  
-State Management: Use useState for form data and useEffect for data fetching.  
-API Pattern: Use a centralized api object (e.g., api.request(path, method, body)).  
-Request Handling: Always include Authorization: Bearer \<token\> in headers.  
-Form Logic: Use a unified handleChange function that detects type="checkbox" to handle booleans via e.target.checked and strings via e.target.value.  
-Update Strategy: Use .map() to update specific items in a list state to maintain UI reactivity without full reloads.  
-4\. Layout Rules  
-Spacing: Use a base-4 grid (4px, 8px, 16px, 24px, 32px).  
-Modals: Centered overlay, semi-transparent backdrop (rgba(0,0,0,0.7)), maximum width 500px.  
-Icons: Use SVG stroke-based icons (lucide-style), set to 1.2em size.  
-Instructions for LLM:  
-"When generating React components, use Tailwind CSS classes or inline styles that strictly adhere to the hex codes and spacing rules above. Ensure all form components include a 'Loading' state and an 'Error' display message using the system red (\#f87171).”
+Component Style Manifest: "Cyber-Terminal"
+1. Visual Foundation
+Color Palette: Deep dark backgrounds (#0b1220 to #111827) with high-contrast accents.
+
+Accents: Primary Blue (#3b82f6), Success Green, Danger Red (#f87171), and Muted Gray (text-muted).
+
+Surface Logic: Components use var(--surface-2) with a 1px solid var(--border) and 10px border-radius.
+
+Shadows: Subtle elevation using var(--shadow).
+
+2. Typography Rules
+Primary Font: Standard sans-serif for body.
+
+Monospace Utility: Use var(--mono) for all labels, numerical values, IDs, timestamps, and button text.
+
+Text Transformation: Headers, labels, and buttons must be uppercase with letter-spacing: 0.08em to 0.12em.
+
+Sizing: * Labels/Badges: 10px to 11px (Bold).
+
+Subtitles: 13px.
+
+Main Values: Large and bold (e.g., 1.8rem).
+
+3. Structural Patterns
+The "Corner Mark": A signature decorative element. Every major container should have an absolute-positioned corner-mark div at the bottom-right:
+
+CSS
+
+.corner-mark { position: absolute; right: -1px; bottom: -1px; width: 14px; height: 14px; border-top: 1px solid var(--border); border-left: 1px solid var(--border); }
+Status Indicators: Use a combination of a colored dot (8px circle) and monospace text.
+
+Tone Property: Components should support a data-tone attribute (primary, success, info, neutral) which applies a 2px solid left border.
+
+4. Iconography
+Style: SVG icons, 24x24 viewbox, none fill, strokeWidth="1.8" or "2".
+
+Container: Icons are housed in a 44px square with a 8px radius and a light background tint (rgba(255, 255, 255, 0.03)).
+
+5. Interaction
+Buttons: Rectangular with 6px radius. Primary buttons are solid; secondary/action buttons are transparent with a 1px border.
+
+Transitions: All hover states must use 0.15s ease.
