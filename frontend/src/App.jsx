@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import api from './services/api';
 import LoginPage from './pages/LoginPage';
 import AdminDashboard from './pages/AdminDashboard';
@@ -7,6 +7,7 @@ import RagLab from './pages/RagLab';
 
 const MainLayout = ({ user, handleLogout, children }) => {
   const navigate = useNavigate();
+  const isRagLab = location.pathname === '/rag-lab';
 
   return (
     <div className="app-shell">
@@ -28,11 +29,17 @@ const MainLayout = ({ user, handleLogout, children }) => {
               <span className="badge-divider">|</span>
               <span className="user-role">{user.roles?.[0] || 'User'}</span>
             </div>
+            {isRagLab ? (
+              <button onClick={() => navigate('/dashboard')} className="btn-logout">
+                Dashboard
+              </button>
+            ) : (
+              <button onClick={() => navigate('/rag-lab')} className="btn-logout">
+                RAG Lab
+              </button>
+            )}
             <button onClick={handleLogout} className="btn-logout">
               Logout
-            </button>
-            <button onClick={() => navigate('/rag-lab')} className="btn-logout">
-              RAG Lab
             </button>
           </div>
         </div>
