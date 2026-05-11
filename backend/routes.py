@@ -50,9 +50,10 @@ def missing_token_callback(error):
 def get_roles():
     roles = Role.query.all()
     user = User.query.get(get_jwt_identity())
+    role_names = "\n".join([r.name for r in roles])
     Log.info(
         f"""All available roles:
-{"\n".join([r.name for r in roles])}
+{role_names}
         """,
         user.id,
     )
@@ -285,7 +286,7 @@ def update_user(user_id):
 def delete_user(user_id):
     current_user_id = get_jwt_identity()
     # Prevent self-deletion
-    if user_id == current_user_id:
+    if str(user_id) == str(current_user_id):
         return jsonify({"error": "You cannot delete your own account"}), 400
 
     user = User.query.get_or_404(user_id)

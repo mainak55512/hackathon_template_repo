@@ -1,19 +1,35 @@
 const API_BASE = "/api";
+const REQUEST_TIMEOUT_MS = 120000;
 
 async function apiCall(path, method, body) {
   const token = localStorage.getItem('access_token');
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   const headers = {
     'Content-Type': 'application/json',
     ...(token && { 'Authorization': `Bearer ${token}` })
   };
 
-  const response = await fetch(`${API_BASE}${path}`, {
-    method,
-    headers,
-    ...(body && { body: JSON.stringify(body) })
-  });
+  try {
+    const response = await fetch(`${API_BASE}${path}`, {
+      method,
+      headers,
+      signal: controller.signal,
+      ...(body && { body: JSON.stringify(body) })
+    });
 
-  return response;
+    return response;
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      const timeoutError = new Error(`Request timed out after ${Math.round(REQUEST_TIMEOUT_MS / 1000)} seconds`);
+      timeoutError.name = 'AbortError';
+      throw timeoutError;
+    }
+
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 const api = {
@@ -58,6 +74,34 @@ const api = {
       }
     }
 
+    if (!response.ok) {
+      let errorData = null;
+      const contentType = response.headers.get("content-type");
+
+      if (contentType && contentType.includes("application/json")) {
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = null;
+        }
+      } else {
+        try {
+          const text = await response.text();
+          errorData = text ? { error: text } : null;
+        } catch {
+          errorData = null;
+        }
+      }
+
+      const message = errorData?.error || response.statusText || 'Request failed';
+      const error = new Error(message);
+      error.response = {
+        status: response.status,
+        data: errorData,
+      };
+      throw error;
+    }
+
     const contentType = response.headers.get("content-type");
     if (contentType && contentType.includes("application/json")) {
       return await response.json();
@@ -71,9 +115,13 @@ const api = {
   getUsers: () => api.request('/users'),
   createUser: (data) => api.request('/users', 'POST', data),
   deleteUser: (id) => api.request('/users/' + id, 'DELETE'),
-  createUser: (userData) => api.request('/users', 'POST', userData),
   updateUser: (id, data) => api.request(`/users/${id}`, 'PUT', data),
   getLogs: () => api.request('/all_logs'),
+  getUsageSummary: () => api.request('/llm/usage'),
+  getRagModels: () => api.request('/rag/models'),
+  getRagStatus: () => api.request('/rag/status'),
+  reindexRag: (force = false) => api.request('/rag/reindex', 'POST', { force }),
+  askRag: (payload) => api.request('/rag/ask', 'POST', payload),
 };
 
 export default api;

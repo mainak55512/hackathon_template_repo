@@ -1,90 +1,129 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import api from '../services/api';
+
+const StatCard = ({ title, value, icon, tone }) => {
+  const icons = {
+    users: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13.732 4c-.77.923-1.168 2.088-1.168 3.387 0 1.299.398 2.464 1.168 3.387M19.914 21a6.994 6.994 0 00-2.433-4.382m-.032 0h1.59',
+    check: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+    shield: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z',
+    log: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+  };
+
+  return (
+    <div className="stat-card" data-tone={tone}>
+      <div className="stat-card-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" d={icons[icon]} />
+        </svg>
+      </div>
+      <div className="stat-card-copy">
+        <span className="stat-card-title">{title}</span>
+        <span className="stat-card-value">{value}</span>
+      </div>
+    </div>
+  );
+};
+
+const getMockLogs = () => [
+  { id: 1, created_at: '2026-05-08 22:15:31', message: 'SYS_AUTH: Connection established', user: 'admin', log_level: 'Info' },
+  { id: 2, created_at: '2026-05-08 21:04:12', message: 'SYS_DB: Hotfile core backup initiated', user: 'daemon_00', log_level: 'Info' },
+  { id: 3, created_at: '2026-05-08 19:40:55', message: 'AUTH_FAIL: Invalid SSH identity payload', user: 'guest_99', log_level: 'Err' },
+  { id: 4, created_at: '2026-05-08 18:12:00', message: 'SEC_AUDIT: Role modification attempted', user: 'j_doe', log_level: 'Warn' },
+  { id: 5, created_at: '2026-05-08 15:30:22', message: 'SYS_CONF: Port 8080 redirected to 443', user: 'admin', log_level: 'Info' },
+];
+
+const formatMoney = (value) => `$${Number(value || 0).toFixed(4)}`;
+const formatTokens = (value) => Number(value || 0).toLocaleString();
 
 const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [logs, setLogs] = useState([]);
-  const [activeTab, setActiveTab] = useState('stats'); // Default active section
+  const [usage, setUsage] = useState(null);
+  const [activeTab, setActiveTab] = useState('stats');
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [formData, setFormData] = useState({ username: '', email: '', password: '', role: 'Viewer', is_active: true });
-  const [error, setError] = useState(null);
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    password: '',
+    role: 'Viewer',
+    is_active: true,
+  });
+  const [error, setError] = useState('');
   const [editingUserId, setEditingUserId] = useState(null);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setFormData({ ...formData, [name]: type === 'checkbox' ? checked : value });
-    setError(null);
+    setFormData((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    setError('');
   };
 
+  const resetForm = () => {
+    setFormData({ username: '', email: '', password: '', role: 'Viewer', is_active: true });
+    setEditingUserId(null);
+  };
 
-  const handleCreateUser = async (e) => {
-    e.preventDefault();
-    setError(null);
+  const closeModal = () => {
+    setIsModalOpen(false);
+    resetForm();
+    setError('');
+  };
 
+  const handleCreateUser = async () => {
+    setError('');
     try {
       const response = await api.createUser(formData);
-
       const newUser = response.data || response;
-      if (newUser && (newUser.id || newUser.username)) {
-        setUsers(prevUsers => [newUser, ...prevUsers]);
+
+      if (newUser?.id || newUser?.username) {
+        setUsers((prevUsers) => [newUser, ...prevUsers]);
 
         if (stats) {
-          setStats(prev => ({
+          setStats((prev) => ({
             ...prev,
             total_users: (Number(prev.total_users) || 0) + 1,
             active_users: (Number(prev.active_users) || 0) + 1,
-            admin_count: formData.role === 'Admin' ? (Number(prev.admin_count) || 0) + 1 : prev.admin_count
+            admin_count: formData.role === 'Admin'
+              ? (Number(prev.admin_count) || 0) + 1
+              : prev.admin_count,
           }));
         }
 
-        setFormData({ username: '', email: '', password: '', role: 'Viewer', is_active: true });
-        setIsModalOpen(false);
+        closeModal();
       }
     } catch (err) {
-      console.error("Creation failed:", err);
-      setError(err.response?.data?.error || "Connection refused by backend");
+      setError(err.response?.data?.error || 'Connection refused by backend');
     }
   };
 
   const initiateEdit = (user) => {
-    // Store the ID so we know we are EDITING, not CREATING
     setEditingUserId(user.id);
-
-    // Fill the form with the user's current values from the table
     setFormData({
       username: user.username,
       email: user.email,
-      password: '', // Keep empty unless the admin wants to reset it
+      password: '',
       role: user.roles?.[0] || user.role || 'Viewer',
-      is_active: user.is_active
+      is_active: user.is_active,
     });
-
     setIsModalOpen(true);
   };
 
-
   const handleUpdateUser = async (id, updatedData) => {
+    setError('');
+
     try {
       const response = await api.updateUser(id, updatedData);
       const updatedUser = response.data || response;
 
       if (updatedUser) {
-        // Mirroring your handleDelete logic:
-        // Instead of .filter(), we use .map() to replace the entry
-        setUsers(prevUsers => prevUsers.map(u => u.id === id ? updatedUser : u));
-
+        setUsers((prevUsers) => prevUsers.map((u) => (u.id === id ? updatedUser : u)));
         const statsData = await api.getStats();
         setStats(statsData);
-
-        // Cleanup
-        setIsModalOpen(false);
-        setEditingUserId(null);
-        setFormData({ username: '', email: '', password: '', role: 'Viewer', is_active: true });
+        closeModal();
       }
     } catch (err) {
-      setError(err.response?.data?.error || "Update protocol failed");
+      setError(err.response?.data?.error || 'Update protocol failed');
     }
   };
 
@@ -92,126 +131,130 @@ const AdminDashboard = () => {
     const loadDashboard = async () => {
       setLoading(true);
       try {
-        const [statsData, usersData] = await Promise.all([
-          api.getStats(),
-          api.getUsers()
-        ]);
+        const [statsData, usersData] = await Promise.all([api.getStats(), api.getUsers()]);
         setStats(statsData);
         setUsers(usersData);
 
-        // Attempt to load live logs from API if method exists; otherwise, use the styled mock registry
         if (api.getLogs) {
           const logsData = await api.getLogs();
           setLogs(logsData);
         } else {
           setLogs(getMockLogs());
         }
+
+        if (api.getUsageSummary) {
+          const usageData = await api.getUsageSummary();
+          setUsage(usageData);
+        }
       } catch (e) {
-        console.error("Error loading dashboard", e);
+        console.error('Error loading dashboard', e);
         setLogs(getMockLogs());
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
+
     loadDashboard();
   }, []);
 
-
   const handleDelete = async (id, username) => {
-    if (window.confirm(`Are you sure you want to delete '${username}'?`)) {
-      await api.deleteUser(id);
-      setUsers(users.filter(u => u.id !== id));
-        const statsData = await api.getStats();
-        setStats(statsData);
-      // setStats(prev => ({ ...prev, total_users: prev.total_users - 1 }));
-    }
+    if (!window.confirm(`Are you sure you want to delete '${username}'?`)) return;
+
+    await api.deleteUser(id);
+    setUsers((prev) => prev.filter((user) => user.id !== id));
+    const statsData = await api.getStats();
+    setStats(statsData);
   };
 
-  // Header configurations dynamic text depending on tab select
   const activeHeaderDetails = {
     stats: {
-      title: "System Telemetry",
-      subtitle: "Realtime core system activity & node metrics"
+      title: 'System Telemetry',
+      subtitle: 'Realtime core system activity and node metrics',
     },
     users: {
-      title: "User Control Matrix",
-      subtitle: "System privilege management and authentication records"
+      title: 'Identity Matrix',
+      subtitle: 'User provisioning, privilege control, and access state',
     },
     logs: {
-      title: "Security Ledger",
-      subtitle: "Secured audit trail of local kernel and login events"
-    }
+      title: 'Security Ledger',
+      subtitle: 'Audit trail for system events and operator activity',
+    },
+    usage: {
+      title: 'LLM Usage Ledger',
+      subtitle: 'Daily, weekly, and monthly token usage with cost totals',
+    },
   };
 
-  if (loading) return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap');
-        .loading-root {
-          min-height: 100vh;
-          background-color: #0d0d0d;
-          background-image:
-            linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
-          background-size: 40px 40px;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          gap: 16px;
-          font-family: 'IBM Plex Mono', monospace;
-          color: #d97706;
-          font-size: 13px;
-        }
-        .dash-spinner {
-          width: 20px;
-          height: 20px;
-          border: 2px solid #222222;
-          border-top-color: #d97706;
-          border-radius: 50%;
-          animation: spin 0.8s linear infinite;
-        }
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
+  if (loading) {
+    return (
       <div className="loading-root">
-        <div className="dash-spinner" />
-        <span>BOOTING DASHBOARD_V1.0.4...</span>
+        <style>{`
+          .loading-root {
+            min-height: calc(100vh - 64px);
+            display: grid;
+            place-items: center;
+            background:
+              radial-gradient(circle at top, rgba(59, 130, 246, 0.12), transparent 34%),
+              linear-gradient(180deg, #0b1220 0%, #111827 100%);
+          }
+          .loading-panel {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            padding: 24px 28px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            background: rgba(31, 41, 55, 0.86);
+            box-shadow: var(--shadow);
+            color: var(--text-primary);
+            font-family: var(--mono);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+          }
+          .loading-spinner {
+            width: 28px;
+            height: 28px;
+            border-radius: 999px;
+            border: 2px solid rgba(255, 255, 255, 0.12);
+            border-top-color: var(--primary);
+            animation: spin 0.8s linear infinite;
+          }
+          @keyframes spin { to { transform: rotate(360deg); } }
+        `}</style>
+        <div className="loading-panel">
+          <div className="loading-spinner" />
+          <span>BOOTING DASHBOARD_V1.0.4...</span>
+        </div>
       </div>
-    </>
-  );
+    );
+  }
 
   return (
-    <>
+    <div className="dash-root">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap');
-
         .dash-root {
           min-height: 100vh;
-          background-color: #0d0d0d;
-          background-image:
-            linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
-          background-size: 40px 40px;
-          padding: 2.5rem 2rem;
-          font-family: 'IBM Plex Sans', sans-serif;
-          color: #e5e5e5;
-          box-sizing: border-box;
+          padding: 32px 24px;
+          color: var(--text-primary);
         }
 
         .dash-wrapper {
-          max-width: 1200px;
+          max-width: 1280px;
           margin: 0 auto;
+          display: flex;
+          flex-direction: column;
+          gap: 24px;
         }
 
-        /* Header Style */
         .dash-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          margin-bottom: 2.5rem;
-          border-bottom: 1px solid #1e1e1e;
-          padding-bottom: 1.5rem;
+          gap: 16px;
+          padding-bottom: 16px;
+          border-bottom: 1px solid var(--border);
         }
 
         .dash-title-group {
@@ -221,186 +264,226 @@ const AdminDashboard = () => {
         }
 
         .dash-title {
-          font-family: 'IBM Plex Mono', monospace;
-          font-size: 1.6rem;
-          font-weight: 600;
-          color: #f5f5f5;
           margin: 0;
-          letter-spacing: -0.01em;
+          color: var(--text-primary);
+          font-family: var(--mono);
+          font-size: 1.1rem;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
         }
 
         .dash-subtitle {
-          font-size: 12px;
-          color: #5a5a5a;
-          font-weight: 300;
-          margin: 0;
+          color: var(--text-muted);
+          font-size: 13px;
+          font-weight: 500;
+        }
+
+        .btn-primary,
+        .btn-secondary,
+        .btn-action-edit,
+        .btn-action-delete {
+          border-radius: 6px;
+          font-family: var(--mono);
+          font-size: 11px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.08em;
+          cursor: pointer;
+          transition: background 0.15s ease, border-color 0.15s ease, filter 0.15s ease;
         }
 
         .btn-primary {
-          background: #d97706;
-          border: none;
-          color: #0d0d0d;
-          font-family: 'IBM Plex Mono', monospace;
-          font-size: 11px;
-          font-weight: 600;
-          letter-spacing: 0.1em;
-          text-transform: uppercase;
-          padding: 10px 18px;
-          cursor: pointer;
-          display: flex;
+          background: var(--primary);
+          color: #fff;
+          border: 1px solid transparent;
+          padding: 8px 16px;
+          display: inline-flex;
           align-items: center;
           gap: 8px;
-          transition: background 0.15s ease, transform 0.1s ease;
         }
 
         .btn-primary:hover {
-          background: #b45309;
+          filter: brightness(1.1);
         }
 
-        .btn-primary:active {
-          transform: scale(0.98);
+        .btn-secondary,
+        .btn-action-edit {
+          background: transparent;
+          color: var(--text-primary);
+          border: 1px solid var(--border);
+          padding: 8px 16px;
         }
 
-        /* Sidebar & Layout Styles */
+        .btn-secondary:hover,
+        .btn-action-edit:hover {
+          background: var(--border);
+        }
+
+        .btn-action-delete {
+          background: transparent;
+          color: var(--danger);
+          border: 1px solid rgba(248, 113, 113, 0.35);
+          padding: 4px 8px;
+        }
+
+        .btn-action-delete:hover {
+          background: rgba(248, 113, 113, 0.12);
+        }
+
         .dash-layout {
           display: flex;
-          gap: 2rem;
           align-items: flex-start;
+          gap: 24px;
         }
 
         .sidebar {
-  			width: 120px;          /* Reduced from 220px */
-  			flex-shrink: 0;
-  			display: flex;
-  			flex-direction: column;
-  			gap: 8px;
-		}
+          width: 170px;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          flex-shrink: 0;
+        }
 
         .sidebar-item {
-          background: #111111;
-          border: 1px solid #222222;
-          border-left: 2px solid transparent;
-          color: #8a8a8a;
-          font-family: 'IBM Plex Mono', monospace;
-          font-size: 11px;
-          text-transform: uppercase;
-          letter-spacing: 0.05em;
-          padding: 12px 16px;
-          cursor: pointer;
-          transition: all 0.15s ease;
-          text-align: left;
+          width: 100%;
           display: flex;
           align-items: center;
-          gap: 12px;
+          gap: 10px;
+          background: var(--surface-2);
+          border: 1px solid var(--border);
+          border-left: 2px solid transparent;
+          color: var(--text-muted);
+          padding: 12px 14px;
+          text-align: left;
+          border-radius: 8px;
+          transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
         }
 
         .sidebar-item:hover {
-          border-color: #333333;
-          color: #f5f5f5;
-          background: rgba(255, 255, 255, 0.01);
+          background: rgba(255, 255, 255, 0.03);
+          color: var(--text-primary);
         }
 
         .sidebar-item.active {
-          border-color: #d97706;
-          border-left: 2px solid #d97706;
-          color: #f5f5f5;
-          background: rgba(217, 119, 6, 0.04);
+          background: rgba(59, 130, 246, 0.08);
+          border-color: rgba(59, 130, 246, 0.5);
+          border-left-color: var(--primary);
+          color: var(--text-primary);
+        }
+
+        .sidebar-item svg,
+        .btn-primary svg {
+          width: 1.2em;
+          height: 1.2em;
         }
 
         .dash-content {
-          flex-grow: 1;
-          min-width: 0; /* Keep tables responsive inside flexbox container */
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 24px;
         }
 
-        /* Stats Cards styling */
+        .usage-stack {
+          display: flex;
+          flex-direction: column;
+          gap: 16px;
+        }
+
         .stats-grid {
           display: grid;
           grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-          gap: 1.25rem;
+          gap: 16px;
         }
 
         .stat-card {
-          background: #111111;
-          border: 1px solid #222222;
-          border-left: 2px solid var(--accent-color, #d97706);
-          padding: 1.25rem;
+          background: var(--surface-2);
+          border: 1px solid var(--border);
+          border-radius: 10px;
+          padding: 16px;
           display: flex;
           align-items: center;
-          gap: 1.25rem;
-          position: relative;
+          gap: 14px;
+          box-shadow: var(--shadow);
         }
+
+        .stat-card[data-tone='primary'] { border-left: 2px solid var(--primary); }
+        .stat-card[data-tone='success'] { border-left: 2px solid var(--success); }
+        .stat-card[data-tone='info'] { border-left: 2px solid var(--primary); }
+        .stat-card[data-tone='neutral'] { border-left: 2px solid var(--text-muted); }
 
         .stat-card-icon {
           width: 44px;
           height: 44px;
-          border-radius: 4px;
-          background: var(--bg-accent, rgba(217, 119, 6, 0.05));
-          border: 1px solid var(--border-accent, rgba(217, 119, 6, 0.15));
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          color: var(--accent-color, #d97706);
+          border-radius: 8px;
+          display: grid;
+          place-items: center;
+          background: rgba(255, 255, 255, 0.03);
+          color: var(--primary);
+          border: 1px solid var(--border);
+          flex-shrink: 0;
         }
 
         .stat-card-icon svg {
-          width: 20px;
-          height: 20px;
-          stroke-width: 1.75;
+          width: 1.2em;
+          height: 1.2em;
         }
 
-        .stat-card-details {
+        .stat-card-copy {
           display: flex;
           flex-direction: column;
           gap: 2px;
         }
 
         .stat-card-title {
-          font-family: 'IBM Plex Mono', monospace;
-          font-size: 9px;
-          letter-spacing: 0.1em;
+          color: var(--text-muted);
+          font-family: var(--mono);
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
           text-transform: uppercase;
-          color: #5a5a5a;
-          margin: 0;
-          font-weight: 500;
         }
 
         .stat-card-value {
-          font-family: 'IBM Plex Mono', monospace;
-          font-size: 1.75rem;
-          font-weight: 600;
-          color: var(--accent-color, #f5f5f5);
-          margin: 0;
+          color: var(--text-primary);
+          font-family: var(--mono);
+          font-size: 1.8rem;
+          font-weight: 700;
         }
 
-        /* Tables container */
         .table-container {
-          background: #111111;
-          border: 1px solid #222222;
           position: relative;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+          overflow: hidden;
+          background: var(--surface-2);
+          border: 1px solid var(--border);
+          border-radius: 10px;
+          box-shadow: var(--shadow);
         }
 
         .table-header {
-          padding: 1.5rem 2rem;
-          border-bottom: 1px solid #1e1e1e;
           display: flex;
           flex-direction: column;
           gap: 4px;
+          padding: 18px 20px;
+          border-bottom: 1px solid var(--border);
+          background: rgba(255, 255, 255, 0.02);
         }
 
         .table-title {
-          font-family: 'IBM Plex Mono', monospace;
-          font-size: 1.1rem;
-          font-weight: 600;
-          color: #f5f5f5;
           margin: 0;
+          color: var(--text-primary);
+          font-family: var(--mono);
+          font-size: 1rem;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
         }
 
         .table-subtitle {
-          font-size: 12px;
-          color: #5a5a5a;
-          margin: 0;
-          font-weight: 300;
+          color: var(--text-muted);
+          font-size: 13px;
         }
 
         .custom-table {
@@ -409,612 +492,617 @@ const AdminDashboard = () => {
           text-align: left;
         }
 
-        .custom-table th {
-          background: #0a0a0a;
-          font-family: 'IBM Plex Mono', monospace;
-          font-size: 9px;
-          letter-spacing: 0.12em;
+        .custom-table thead th {
+          position: sticky;
+          top: 0;
+          z-index: 1;
+          background: #0f172a;
+          color: var(--text-muted);
+          font-family: var(--mono);
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.08em;
           text-transform: uppercase;
-          color: #4a4a4a;
-          padding: 14px 2rem;
-          border-bottom: 1px solid #1e1e1e;
-          font-weight: 500;
         }
 
+        .custom-table th,
         .custom-table td {
-          padding: 16px 2rem;
-          border-bottom: 1px solid #1a1a1a;
-          font-size: 13px;
-          vertical-align: middle;
-        }
-
-        .custom-table tr:last-child td {
-          border-bottom: none;
+          padding: 12px 16px;
+          border-bottom: 1px solid var(--border);
         }
 
         .custom-table tr:hover td {
-          background: #141414;
+          background: rgba(255, 255, 255, 0.02);
         }
 
-        /* Table cells customized styles */
         .username-cell {
-          font-family: 'IBM Plex Mono', monospace;
-          font-weight: 500;
-          color: #e5e5e5;
+          font-family: var(--mono);
+          color: var(--text-primary);
+          font-weight: 600;
         }
 
-        .email-cell {
-          color: #737373;
+        .email-cell,
+        .operator-cell,
+        .ip-cell {
+          color: var(--text-muted);
+          font-family: var(--mono);
         }
 
         .role-badge {
           display: inline-flex;
-          font-family: 'IBM Plex Mono', monospace;
+          align-items: center;
+          gap: 8px;
+          padding: 4px 8px;
+          border-radius: 999px;
+          font-family: var(--mono);
           font-size: 10px;
-          letter-spacing: 0.05em;
+          font-weight: 700;
+          letter-spacing: 0.08em;
           text-transform: uppercase;
-          padding: 3px 8px;
-          font-weight: 500;
+          border: 1px solid var(--border);
+          color: var(--text-primary);
+          background: rgba(255, 255, 255, 0.03);
         }
 
         .role-admin {
-          background: rgba(217, 119, 6, 0.1);
-          border: 1px solid rgba(217, 119, 6, 0.3);
-          color: #d97706;
-        }
-
-        .role-user {
-          background: rgba(255, 255, 255, 0.03);
-          border: 1px solid rgba(255, 255, 255, 0.08);
-          color: #8a8a8a;
+          border-color: rgba(59, 130, 246, 0.4);
+          background: rgba(59, 130, 246, 0.08);
         }
 
         .status-indicator {
           display: inline-flex;
           align-items: center;
-          gap: 6px;
-          font-family: 'IBM Plex Mono', monospace;
+          gap: 8px;
+          color: var(--text-primary);
+          font-family: var(--mono);
           font-size: 10px;
-          text-transform: uppercase;
+          font-weight: 700;
           letter-spacing: 0.08em;
-          font-weight: 500;
+          text-transform: uppercase;
         }
 
         .status-dot {
-          width: 5px;
-          height: 5px;
-          border-radius: 50%;
+          width: 8px;
+          height: 8px;
+          border-radius: 999px;
+          display: inline-block;
         }
 
-        .status-active {
-          color: #10b981;
-        }
+        .status-active { color: var(--success); }
+        .status-active .status-dot { background: var(--success); }
+        .status-inactive { color: var(--text-muted); }
+        .status-inactive .status-dot { background: var(--text-muted); }
+        .status-failed { color: var(--danger); }
+        .status-failed .status-dot { background: var(--danger); }
+        .status-warning { color: #fbbf24; }
+        .status-warning .status-dot { background: #fbbf24; }
 
-        .status-active .status-dot {
-          background: #10b981;
-          box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
-        }
-
-        .status-inactive {
-          color: #525252;
-        }
-
-        .status-inactive .status-dot {
-          background: #525252;
-        }
-
-        /* Logs table styles */
         .timestamp-cell {
-          font-family: 'IBM Plex Mono', monospace;
-          color: #d97706;
+          font-family: var(--mono);
+          color: var(--primary);
           font-size: 12px;
         }
 
         .event-cell {
-          color: #e5e5e5;
-        }
-
-        .operator-cell {
-          font-family: 'IBM Plex Mono', monospace;
-          color: #a3a3a3;
-        }
-
-        .ip-cell {
-          font-family: 'IBM Plex Mono', monospace;
-          color: #525252;
-        }
-
-        .status-failed {
-          color: #ef4444;
-        }
-
-        .status-failed .status-dot {
-          background: #ef4444;
-          box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
-        }
-
-        .status-warning {
-          color: #f59e0b;
-        }
-
-        .status-warning .status-dot {
-          background: #f59e0b;
-          box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
+          color: var(--text-primary);
         }
 
         .actions-cell {
           text-align: right;
-        }
-
-        .btn-action-edit {
-          background: transparent;
-          border: 1px solid #2a2a2a;
-          color: #a3a3a3;
-          font-family: 'IBM Plex Mono', monospace;
-          font-size: 10px;
-          text-transform: uppercase;
-          padding: 5px 10px;
-          cursor: pointer;
-          transition: all 0.15s ease;
-          margin-right: 6px;
-        }
-
-        .btn-action-edit:hover {
-          border-color: #404040;
-          color: #f5f5f5;
-          background: rgba(255, 255, 255, 0.02);
-        }
-
-        .btn-action-delete {
-          background: rgba(220, 38, 38, 0.05);
-          border: 1px solid rgba(220, 38, 38, 0.2);
-          color: #f87171;
-          font-family: 'IBM Plex Mono', monospace;
-          font-size: 10px;
-          text-transform: uppercase;
-          padding: 5px 10px;
-          cursor: pointer;
-          transition: all 0.15s ease;
-        }
-
-        .btn-action-delete:hover {
-          background: rgba(220, 38, 38, 0.15);
-          border-color: rgba(220, 38, 38, 0.45);
+          white-space: nowrap;
         }
 
         .corner-mark {
           position: absolute;
-          bottom: -1px;
           right: -1px;
+          bottom: -1px;
           width: 14px;
           height: 14px;
-          border-top: 1px solid #2a2a2a;
-          border-left: 1px solid #2a2a2a;
+          border-top: 1px solid var(--border);
+          border-left: 1px solid var(--border);
         }
 
-        /* Responsive Layout wrapping rules */
-        @media (max-width: 768px) {
-          .dash-layout {
-            flex-direction: column;
-            gap: 1.5rem;
-          }
-          .sidebar {
-            width: 100%;
-            flex-direction: row;
-            overflow-x: auto;
-          }
-          .sidebar-item {
-            flex: 1;
-            justify-content: center;
-            white-space: nowrap;
-          }
-        }
         .modal-overlay {
           position: fixed;
-          top: 0; left: 0; right: 0; bottom: 0;
-          background: rgba(0,0,0,0.85);
-          display: flex; align-items: center; justify-content: center;
-          z-index: 1000; backdrop-filter: blur(4px);
+          inset: 0;
+          z-index: 1000;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 24px;
+          background: rgba(0, 0, 0, 0.7);
+          backdrop-filter: blur(4px);
         }
 
         .modal-content {
-          background: #111;
-          border: 1px solid #222;
-          width: 400px;
-          padding: 2rem;
+          width: 100%;
+          max-width: 500px;
+          background: var(--surface-2);
+          border: 1px solid var(--border);
+          border-radius: 10px;
+          box-shadow: var(--shadow);
+          padding: 24px;
           position: relative;
-          box-shadow: 0 0 30px rgba(0,0,0,0.5);
         }
 
-        .form-group { margin-bottom: 1.2rem; }
-        
+        .form-group {
+          margin-bottom: 16px;
+        }
+
         .form-label {
           display: block;
-          font-family: 'IBM Plex Mono', monospace;
+          margin-bottom: 4px;
+          color: var(--text-muted);
+          font-family: var(--mono);
           font-size: 10px;
-          color: #5a5a5a;
+          font-weight: 700;
+          letter-spacing: 0.08em;
           text-transform: uppercase;
-          text-align: left;
-          margin-bottom: 6px;
         }
 
         .form-input {
           width: 100%;
-          background: #0a0a0a;
-          border: 1px solid #222;
-          color: #e5e5e5;
-          padding: 10px;
-          font-family: 'IBM Plex Sans', sans-serif;
+          border: 1px solid var(--border);
+          border-radius: 6px;
+          background: var(--surface);
+          color: var(--text-primary);
+          padding: 12px 14px;
+          font-family: var(--mono);
           font-size: 13px;
-          box-sizing: border-box;
+          outline: none;
         }
 
         .form-input:focus {
-          outline: none;
-          border-color: #d97706;
+          border-color: var(--primary);
         }
 
         .error-msg {
-          color: #ef4444;
-          font-family: 'IBM Plex Mono', monospace;
+          margin-bottom: 16px;
+          color: var(--danger);
+          font-family: var(--mono);
           font-size: 10px;
-          margin-bottom: 1rem;
+          font-weight: 700;
+          letter-spacing: 0.08em;
           text-transform: uppercase;
         }
 
         .modal-actions {
           display: flex;
           justify-content: flex-end;
-          gap: 12px;
-          margin-top: 1.5rem;
+          gap: 8px;
+          margin-top: 20px;
+        }
+
+        @media (max-width: 900px) {
+          .dash-root {
+            padding: 24px 16px;
+          }
+
+          .dash-header,
+          .dash-layout {
+            flex-direction: column;
+          }
+
+          .sidebar {
+            width: 100%;
+            flex-direction: row;
+            overflow-x: auto;
+          }
+
+          .sidebar-item {
+            min-width: 140px;
+          }
         }
       `}</style>
 
-      <div className="dash-root">
-        <div className="dash-wrapper">
+      <div className="dash-wrapper">
+        <div className="dash-header">
+          <div className="dash-title-group">
+            <h1 className="dash-title">{activeHeaderDetails[activeTab].title}</h1>
+            <p className="dash-subtitle">{activeHeaderDetails[activeTab].subtitle}</p>
+          </div>
 
-          {/* Dynamic Header */}
-          <div className="dash-header">
-            <div className="dash-title-group">
-              <h1 className="dash-title">{activeHeaderDetails[activeTab].title}</h1>
-              <p className="dash-subtitle">{activeHeaderDetails[activeTab].subtitle}</p>
-            </div>
-
-            {/* Conditionally render actions depending on active view */}
+          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             {activeTab === 'users' && (
               <button className="btn-primary" onClick={() => setIsModalOpen(true)}>
-                <svg style={{ width: '12px', height: '12px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 4v16m8-8H4" />
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
                 </svg>
                 Add User
               </button>
             )}
 
             {activeTab === 'logs' && (
-              <button className="btn-primary" onClick={async () => {
-                const logsData = await api.getLogs();
-                setLogs(logsData);
-              }}>
-                <svg viewBox="0 0 24 24" style={{ width: '16px', height: '16px', stroke: 'currentColor', fill: 'none', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' }}>
+              <button
+                className="btn-primary"
+                onClick={async () => {
+                  const logsData = await api.getLogs();
+                  setLogs(logsData);
+                }}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
                   <polyline points="23 4 23 10 17 10" />
                   <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
                 </svg>
-                refresh
+                Refresh
               </button>
             )}
           </div>
+        </div>
 
-          <div className="dash-layout">
+        <div className="dash-layout">
+          <aside className="sidebar">
+            <button
+              onClick={() => setActiveTab('stats')}
+              className={`sidebar-item ${activeTab === 'stats' ? 'active' : ''}`}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
+              </svg>
+              Stats
+            </button>
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`sidebar-item ${activeTab === 'users' ? 'active' : ''}`}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13.732 4c-.77.923-1.168 2.088-1.168 3.387 0 1.299.398 2.464 1.168 3.387M19.914 21a6.994 6.994 0 00-2.433-4.382m-.032 0h1.59" />
+              </svg>
+              Users
+            </button>
+            <button
+              onClick={() => setActiveTab('logs')}
+              className={`sidebar-item ${activeTab === 'logs' ? 'active' : ''}`}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Logs
+            </button>
+            <button
+              onClick={() => setActiveTab('usage')}
+              className={`sidebar-item ${activeTab === 'usage' ? 'active' : ''}`}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 19V5m0 14h16M8 17v-6m4 6V7m4 10v-3" />
+              </svg>
+              Usage
+            </button>
+          </aside>
 
-            {/* Sidebar Navigation */}
-            <aside className="sidebar">
-              <button
-                onClick={() => setActiveTab('stats')}
-                className={`sidebar-item ${activeTab === 'stats' ? 'active' : ''}`}
-              >
-                <svg style={{ width: '15px', height: '15px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" />
-                </svg>
-                Stats
-              </button>
-              <button
-                onClick={() => setActiveTab('users')}
-                className={`sidebar-item ${activeTab === 'users' ? 'active' : ''}`}
-              >
-                <svg style={{ width: '15px', height: '15px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13.732 4c-.77.923-1.168 2.088-1.168 3.387 0 1.299.398 2.464 1.168 3.387M19.914 21a6.994 6.994 0 00-2.433-4.382m-.032 0h1.59" />
-                </svg>
-                Users
-              </button>
-              <button
-                onClick={() => setActiveTab('logs')}
-                className={`sidebar-item ${activeTab === 'logs' ? 'active' : ''}`}
-              >
-                <svg style={{ width: '15px', height: '15px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                Logs
-              </button>
-            </aside>
-
-            {/* Core Content Area */}
-            <div className="dash-content">
-
-              {/* SECTION: STATS */}
+          <div className="dash-content">
               {activeTab === 'stats' && stats && (
                 <div className="stats-grid">
-                  <StatCard
-                    title="Total Users"
-                    value={stats.total_users}
-                    icon="users"
-                    color="#d97706"
-                    bgAccent="rgba(217, 119, 6, 0.04)"
-                    borderAccent="rgba(217, 119, 6, 0.15)"
-                  />
-                  <StatCard
-                    title="Active Accounts"
-                    value={stats.active_users}
-                    icon="check"
-                    color="#10b981"
-                    bgAccent="rgba(16, 185, 129, 0.04)"
-                    borderAccent="rgba(16, 185, 129, 0.15)"
-                  />
-                  <StatCard
-                    title="Administrators"
-                    value={stats.admin_count}
-                    icon="shield"
-                    color="#0ea5e9"
-                    bgAccent="rgba(14, 165, 233, 0.04)"
-                    borderAccent="rgba(14, 165, 233, 0.15)"
-                  />
+                  <StatCard title="Total Users" value={stats.total_users} icon="users" tone="primary" />
+                  <StatCard title="Active Accounts" value={stats.active_users} icon="check" tone="success" />
+                  <StatCard title="Administrators" value={stats.admin_count} icon="shield" tone="info" />
                   <StatCard
                     title="System Status"
-                    value={users.length > 0 ? "ONLINE" : "OFFLINE"}
+                    value={users.length > 0 ? 'ONLINE' : 'OFFLINE'}
                     icon="log"
-                    color="#a855f7"
-                    bgAccent="rgba(168, 85, 247, 0.04)"
-                    borderAccent="rgba(168, 85, 247, 0.15)"
+                    tone="neutral"
                   />
                 </div>
               )}
 
-              {/* SECTION: USERS */}
-              {activeTab === 'users' && (
-                <div className="table-container">
-                  <div className="table-header">
-                    <h2 className="table-title">User Management Database</h2>
-                    <p className="table-subtitle">System privilege registry registry_v1.0</p>
-                  </div>
-
-                  <table className="custom-table">
-                    <thead>
-                      <tr>
-                        <th>Username</th>
-                        <th>Email Address</th>
-                        <th>System Role</th>
-                        <th>Status</th>
-                        <th style={{ textAlign: 'right' }}>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {users.map(user => (
-                        <tr key={user.id}>
-                          <td className="username-cell">{user?.username || 'N/A'}</td>
-                          <td className="email-cell">{user.email}</td>
-                          <td>
-                            <span className={`role-badge ${(user.roles?.includes('Admin') || user.role === 'Admin') ? 'role-admin' : 'role-user'
-                              }`}>
-                              {user.roles?.[0] || user.role || 'User'}
-                            </span>
-                          </td>
-                          <td>
-                            {user.is_active ? (
-                              <span className="status-indicator status-active">
-                                <span className="status-dot" />
-                                Active
-                              </span>
-                            ) : (
-                              <span className="status-indicator status-inactive">
-                                <span className="status-dot" />
-                                Inactive
-                              </span>
-                            )}
-                          </td>
-                          <td className="actions-cell">
-                            <button className="btn-action-edit" onClick={() => initiateEdit(user)}>Edit</button>
-                            <button
-                              onClick={() => handleDelete(user.id, user.username)}
-                              className="btn-action-delete"
-                            >
-                              Delete
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-
-                  <div className="corner-mark" />
+            {activeTab === 'users' && (
+              <div className="table-container">
+                <div className="table-header">
+                  <h2 className="table-title">User Management Database</h2>
+                  <p className="table-subtitle">System privilege registry v1.0</p>
                 </div>
+
+                <table className="custom-table">
+                  <thead>
+                    <tr>
+                      <th>Username</th>
+                      <th>Email Address</th>
+                      <th>System Role</th>
+                      <th>Status</th>
+                      <th style={{ textAlign: 'right' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {users.map((user) => (
+                      <tr key={user.id}>
+                        <td className="username-cell">{user?.username || 'N/A'}</td>
+                        <td className="email-cell">{user.email}</td>
+                        <td>
+                          <span className={`role-badge ${user.roles?.includes('Admin') ? 'role-admin' : ''}`}>
+                            {user.roles?.[0] || user.role || 'User'}
+                          </span>
+                        </td>
+                        <td>
+                          {user.is_active ? (
+                            <span className="status-indicator status-active">
+                              <span className="status-dot" />
+                              Active
+                            </span>
+                          ) : (
+                            <span className="status-indicator status-inactive">
+                              <span className="status-dot" />
+                              Inactive
+                            </span>
+                          )}
+                        </td>
+                        <td className="actions-cell">
+                          <button className="btn-action-edit" onClick={() => initiateEdit(user)}>
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(user.id, user.username)}
+                            className="btn-action-delete"
+                            style={{ marginLeft: '8px' }}
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div className="corner-mark" />
+              </div>
+            )}
+
+              {activeTab === 'logs' && (
+                <div className="table-container">
+                <div className="table-header">
+                  <h2 className="table-title">System Event Audit Log</h2>
+                  <p className="table-subtitle">Cryptographic terminal activity trace v1.2</p>
+                </div>
+
+                <table className="custom-table">
+                  <thead>
+                    <tr>
+                      <th>Timestamp</th>
+                      <th>Activity</th>
+                      <th>Operator</th>
+                      <th>Log Level</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {logs.map((log) => (
+                      <tr key={log.id}>
+                        <td className="timestamp-cell">{log.created_at}</td>
+                        <td className="event-cell">{log.message}</td>
+                        <td className="operator-cell">{log.user}</td>
+                        <td>
+                          {log.log_level === 'Info' && (
+                            <span className="status-indicator status-active">
+                              <span className="status-dot" />
+                              Info
+                            </span>
+                          )}
+                          {log.log_level === 'Err' && (
+                            <span className="status-indicator status-failed">
+                              <span className="status-dot" />
+                              Error
+                            </span>
+                          )}
+                          {log.log_level === 'Warn' && (
+                            <span className="status-indicator status-warning">
+                              <span className="status-dot" />
+                              Warning
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+
+                <div className="corner-mark" />
+              </div>
               )}
 
-              {isModalOpen && (
-                <div className="modal-overlay">
-                  <div className="modal-content">
-                    <h2 className="table-title">
-                      {editingUserId ? `Edit User: ${formData.username}` : "Provision New Identity"}
-                    </h2>
-                    {error && <div className="error-msg">!! {error}</div>}
+              {activeTab === 'usage' && usage && (
+                <div className="usage-stack">
+                  <div className="stats-grid">
+                    <StatCard title="Daily Cost" value={formatMoney(usage.periods?.daily?.total_cost)} icon="log" tone="primary" />
+                    <StatCard title="Weekly Cost" value={formatMoney(usage.periods?.weekly?.total_cost)} icon="check" tone="success" />
+                    <StatCard title="Monthly Cost" value={formatMoney(usage.periods?.monthly?.total_cost)} icon="shield" tone="info" />
+                    <StatCard title="Monthly Tokens" value={formatTokens(usage.periods?.monthly?.total_tokens)} icon="users" tone="neutral" />
+                  </div>
 
-                    <form onSubmit={(e) => {
-                      e.preventDefault();
-                      if (editingUserId) {
-                        handleUpdateUser(editingUserId, formData);
-                      } else {
-                        handleCreateUser(e); // Your original creation logic
-                      }
-                    }}>
-                      <div className="form-group">
-                        <label className="form-label">Username</label>
-                        <input className="form-input" name="username" value={formData.username} onChange={handleChange} required />
-                      </div>
+                  <div className="table-container">
+                    <div className="table-header">
+                      <h2 className="table-title">Usage Period Summary</h2>
+                      <p className="table-subtitle">Tokens and costs for the last 24 hours, 7 days, and 30 days</p>
+                    </div>
+                    <table className="custom-table">
+                      <thead>
+                        <tr>
+                          <th>Period</th>
+                          <th>Total Tokens</th>
+                          <th>Input</th>
+                          <th>Output</th>
+                          <th>Embedding</th>
+                          <th>Total Cost</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {['daily', 'weekly', 'monthly'].map((period) => {
+                          const row = usage.periods?.[period] || {};
+                          return (
+                            <tr key={period}>
+                              <td className="username-cell">{period}</td>
+                              <td>{formatTokens(row.total_tokens)}</td>
+                              <td>{formatTokens(row.input_tokens)}</td>
+                              <td>{formatTokens(row.output_tokens)}</td>
+                              <td>{formatTokens(row.embedding_tokens)}</td>
+                              <td>{formatMoney(row.total_cost)}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    <div className="corner-mark" />
+                  </div>
 
-                      <div className="form-group">
-                        <label className="form-label">Email Address</label>
-                        <input className="form-input" type="email" name="email" value={formData.email} onChange={handleChange} required />
-                      </div>
+                  <div className="table-container">
+                    <div className="table-header">
+                      <h2 className="table-title">Current Rate Card</h2>
+                      <p className="table-subtitle">Token rates are per 1M tokens for the configured models</p>
+                    </div>
+                    <table className="custom-table">
+                      <thead>
+                        <tr>
+                          <th>Model</th>
+                          <th>Input / 1M</th>
+                          <th>Output / 1M</th>
+                          <th>Cached / 1M</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(usage.rates?.models || {}).map(([model, rate]) => (
+                          <tr key={model}>
+                            <td className="username-cell">{model}</td>
+                            <td>{formatMoney(rate.input_per_1m)}</td>
+                            <td>{formatMoney(rate.output_per_1m)}</td>
+                            <td>{formatMoney(rate.cached_input_per_1m)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div className="corner-mark" />
+                  </div>
 
-                      <div className="form-group">
-                        <label className="form-label">Temporary Password</label>
-                        <input
-                          className="form-input"
-                          type="password"
-                          name="password"
-                          value={formData.password}
-                          onChange={handleChange}
-                          // If we are editing, it's NOT required. If we are creating, it IS required.
-                          required={!editingUserId}
-                          placeholder={editingUserId ? "Leave blank to keep current" : "••••••••"} />
-                      </div>
-
-                      <div className="form-group">
-                        <label className="form-label">Access Level</label>
-                        <select className="form-input" name="role" value={formData.role} onChange={handleChange}>
-                          <option value="Viewer">User</option>
-                          <option value="Admin">Admin</option>
-                        </select>
-                      </div>
-
-
-                      {editingUserId && (
-                        <>
-                          <label className="form-label" style={{ marginBottom: 0 }}>Account Status:</label>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <input
-                              type="checkbox"
-                              id="is_active"
-                              name="is_active"
-                              checked={formData.is_active}
-                              onChange={handleChange}
-                              style={{ cursor: 'pointer', width: '18px', height: '18px' }}
-                            />
-                            <label htmlFor="is_active" style={{ color: formData.is_active ? '#4ade80' : '#f87171', fontSize: '14px', fontWeight: 'bold' }}>
-                              {formData.is_active ? 'ACTIVE' : 'DEACTIVATED'}
-                            </label>
-                          </div>
-                        </>
-                      )}
-
-                      <div className="modal-actions">
-                        <button type="button" className="btn-action-edit" onClick={() => {
-                          setEditingUserId(null)
-                          setFormData({ username: '', email: '', password: '', role: 'Viewer', is_active: true });
-                          setIsModalOpen(false)
-                        }}>Cancel</button>
-                        <button type="submit" className="btn-primary">Save</button>
-                      </div>
-                    </form>
+                  <div className="table-container">
+                    <div className="table-header">
+                      <h2 className="table-title">Embedding Rate</h2>
+                      <p className="table-subtitle">Rate for the active embedding model used by RAG indexing and retrieval</p>
+                    </div>
+                    <table className="custom-table">
+                      <thead>
+                        <tr>
+                          <th>Embedding Model</th>
+                          <th>Rate / 1M</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr>
+                          <td className="username-cell">{usage.rates?.embedding_model}</td>
+                          <td>{formatMoney(usage.rates?.embeddings?.[usage.rates?.embedding_model] || 0)}</td>
+                        </tr>
+                      </tbody>
+                    </table>
                     <div className="corner-mark" />
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+      </div>
 
-              {/* SECTION: LOGS */}
-              {activeTab === 'logs' && (
-                <div className="table-container">
-                  <div className="table-header">
-                    <h2 className="table-title">System Event Audit Log</h2>
-                    <p className="table-subtitle">Cryptographic terminal activity trace_v1.2</p>
+      {isModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <h2 className="table-title">
+              {editingUserId ? `Edit User: ${formData.username}` : 'Provision New Identity'}
+            </h2>
+
+            {error && <div className="error-msg">!! {error}</div>}
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (editingUserId) {
+                  handleUpdateUser(editingUserId, formData);
+                } else {
+                  handleCreateUser();
+                }
+              }}
+            >
+              <div className="form-group">
+                <label className="form-label">Username</label>
+                <input
+                  className="form-input"
+                  name="username"
+                  value={formData.username}
+                  onChange={handleChange}
+                  required
+                  readOnly={Boolean(editingUserId)}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Email Address</label>
+                <input
+                  className="form-input"
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Temporary Password</label>
+                <input
+                  className="form-input"
+                  type="password"
+                  name="password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  required={!editingUserId}
+                  placeholder={editingUserId ? 'Leave blank to keep current' : '••••••••'}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">Access Level</label>
+                <select className="form-input" name="role" value={formData.role} onChange={handleChange}>
+                  <option value="Viewer">User</option>
+                  <option value="Admin">Admin</option>
+                </select>
+              </div>
+
+              {editingUserId && (
+                <div className="form-group">
+                  <label className="form-label">Account Status</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input
+                      type="checkbox"
+                      id="is_active"
+                      name="is_active"
+                      checked={formData.is_active}
+                      onChange={handleChange}
+                      style={{ width: '16px', height: '16px', accentColor: 'var(--primary)' }}
+                    />
+                    <label
+                      htmlFor="is_active"
+                      style={{
+                        color: formData.is_active ? 'var(--success)' : 'var(--danger)',
+                        fontFamily: 'var(--mono)',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        letterSpacing: '0.08em',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      {formData.is_active ? 'Active' : 'Deactivated'}
+                    </label>
                   </div>
-
-                  <table className="custom-table">
-                    <thead>
-                      <tr>
-                        <th>Timestamp</th>
-                        <th>Activity</th>
-                        <th>Operator</th>
-                        <th>Log level</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {logs.map(log => (
-                        <tr key={log.id}>
-                          <td className="timestamp-cell">{log.created_at}</td>
-                          <td className="event-cell">{log.message}</td>
-                          <td className="operator-cell">{log.user}</td>
-                          <td>
-                            {log.log_level === 'Info' && (
-                              <span className="status-indicator status-active">
-                                <span className="status-dot" />
-                                Info
-                              </span>
-                            )}
-                            {log.log_level === 'Err' && (
-                              <span className="status-indicator status-failed">
-                                <span className="status-dot" />
-                                Error
-                              </span>
-                            )}
-                            {log.log_level === 'Warn' && (
-                              <span className="status-indicator status-warning">
-                                <span className="status-dot" />
-                                Warning
-                              </span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-
-                  <div className="corner-mark" />
                 </div>
               )}
 
-            </div>
+              <div className="modal-actions">
+                <button type="button" className="btn-secondary" onClick={closeModal}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary">
+                  Save
+                </button>
+              </div>
+            </form>
+
+            <div className="corner-mark" />
           </div>
-
         </div>
-      </div>
-    </>
-  );
-};
-
-// Mock data generator for terminal event tracking
-const getMockLogs = () => [
-  { id: 1, timestamp: '2026-05-08 22:15:31', event: 'SYS_AUTH: Connection established', user: 'admin', status: 'success', ip: '192.168.1.105' },
-  { id: 2, timestamp: '2026-05-08 21:04:12', event: 'SYS_DB: Hotfile core backup initiated', user: 'daemon_00', status: 'success', ip: 'localhost' },
-  { id: 3, timestamp: '2026-05-08 19:40:55', event: 'AUTH_FAIL: Invalid SSH identity payload', user: 'guest_99', status: 'failed', ip: '45.122.10.84' },
-  { id: 4, timestamp: '2026-05-08 18:12:00', event: 'SEC_AUDIT: Role modification attempted', user: 'j_doe', status: 'warning', ip: '192.168.1.112' },
-  { id: 5, timestamp: '2026-05-08 15:30:22', event: 'SYS_CONF: Port 8080 redirected to 443', user: 'admin', status: 'success', ip: '192.168.1.105' }
-];
-
-// Reusable Helper Component for themed Stats Card
-const StatCard = ({ title, value, icon, color, bgAccent, borderAccent }) => {
-  const icons = {
-    users: "M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13.732 4c-.77.923-1.168 2.088-1.168 3.387 0 1.299.398 2.464 1.168 3.387M19.914 21a6.994 6.994 0 00-2.433-4.382m-.032 0h1.59",
-    check: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
-    shield: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
-    log: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-  };
-
-  const cardStyle = {
-    '--accent-color': color,
-    '--bg-accent': bgAccent,
-    '--border-accent': borderAccent
-  };
-
-  return (
-    <div className="stat-card" style={cardStyle}>
-      <div className="stat-card-icon">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={icons[icon]} />
-        </svg>
-      </div>
-      <div className="stat-card-details">
-        <p className="stat-card-title">{title}</p>
-        <p className="stat-card-value">{value}</p>
-      </div>
+      )}
     </div>
   );
 };
